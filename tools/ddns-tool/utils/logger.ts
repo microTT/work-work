@@ -1,5 +1,14 @@
 import winston from 'winston';
 import { existsSync, mkdirSync } from 'fs';
+import { config } from 'dotenv';
+
+// 统一配置文件路径
+const UNIFIED_CONFIG_PATH = '/tmp/tide/.env';
+
+// 加载统一配置文件
+if (existsSync(UNIFIED_CONFIG_PATH)) {
+  config({ path: UNIFIED_CONFIG_PATH });
+}
 
 export function createLogger(serviceName: string = 'ddns-tool'): winston.Logger {
   const logDir = './logs';

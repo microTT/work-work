@@ -30,9 +30,6 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/utils ./utils
 COPY config.ts ./
 
-# Copy environment files
-COPY .env .env.local ./
-
 # Create directories
 RUN mkdir -p logs cache
 
