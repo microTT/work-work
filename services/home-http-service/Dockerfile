@@ -1,5 +1,5 @@
 # Home HTTP Service - Independent Docker Image
-FROM node:18-alpine AS base
+FROM node:lts-alpine3.21 AS base
 
 WORKDIR /app
 
@@ -21,7 +21,7 @@ COPY utils/ ./utils/
 RUN npm run build
 
 # Production stage
-FROM node:18-alpine AS production
+FROM node:lts-alpine3.21 AS production
 
 WORKDIR /app
 
