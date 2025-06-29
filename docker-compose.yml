@@ -13,6 +13,7 @@ services:
       - NODE_ENV=production
     volumes:
       - ./services/cloud-http-service/logs:/app/logs
+      - /tmp/tide/.env:/tmp/tide/.env:ro
     restart: unless-stopped
 
   # 家用服务 - 简化版
@@ -27,6 +28,7 @@ services:
       - NODE_ENV=production
     volumes:
       - ./services/home-http-service/logs:/app/logs
+      - /tmp/tide/.env:/tmp/tide/.env:ro
     restart: unless-stopped
     depends_on:
       - cloud-http-service
@@ -44,6 +46,7 @@ services:
     volumes:
       - ./tools/ddns-tool/logs:/app/logs
       - ./tools/ddns-tool/cache:/app/cache
+      - /tmp/tide/.env:/tmp/tide/.env:ro
     restart: unless-stopped
     depends_on:
       - cloud-http-service
