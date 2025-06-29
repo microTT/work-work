@@ -4,7 +4,7 @@ FROM node:lts-alpine3.21 AS builder
 WORKDIR /app
 
 # Copy package files and install all dependencies
-COPY package*.json ./
+COPY package.json package-lock.json ./
 COPY tsconfig.json ./
 RUN npm ci
 
@@ -22,8 +22,8 @@ FROM node:lts-alpine3.21 AS production
 WORKDIR /app
 
 # Copy package files and install production dependencies
-COPY package*.json ./
-RUN npm ci --only=production && npm cache clean --force
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
 
 # Copy built application and config
 COPY --from=builder /app/dist ./dist

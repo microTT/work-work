@@ -4,7 +4,7 @@ FROM node:lts-alpine3.21 AS base
 WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
+COPY package.json package-lock.json ./
 COPY next.config.js ./
 COPY tsconfig.json ./
 
@@ -24,9 +24,9 @@ FROM node:lts-alpine3.21 AS production
 WORKDIR /app
 
 # Install only production dependencies
-COPY package*.json ./
+COPY package.json package-lock.json ./
 COPY next.config.js ./
-RUN npm ci --only=production && npm cache clean --force
+RUN npm ci --omit=dev && npm cache clean --force
 
 # Copy built application
 COPY --from=base /app/.next ./.next
