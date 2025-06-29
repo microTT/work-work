@@ -1,5 +1,5 @@
 # Simple DDNS Tool
-FROM node:18-alpine AS builder
+FROM node:lts-alpine3.21 AS builder
 
 WORKDIR /app
 
@@ -17,7 +17,7 @@ COPY config.ts ./
 RUN npm run build
 
 # Production stage
-FROM node:18-alpine AS production
+FROM node:lts-alpine3.21 AS production
 
 WORKDIR /app
 
