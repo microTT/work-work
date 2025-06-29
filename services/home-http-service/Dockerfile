@@ -13,8 +13,6 @@ RUN npm ci
 
 # Copy source code
 COPY pages/ ./pages/
-COPY src/ ./src/
-COPY public/ ./public/
 COPY utils/ ./utils/
 
 # Build the Next.js application
@@ -32,7 +30,6 @@ RUN npm ci --only=production && npm cache clean --force
 
 # Copy built application
 COPY --from=base /app/.next ./.next
-COPY --from=base /app/public ./public
 COPY --from=base /app/next.config.js ./
 
 # Create necessary directories
