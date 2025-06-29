@@ -5,8 +5,8 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "start": "node -r dotenv/config dist/index.js",
-    "start:prod": "NODE_ENV=production node -r dotenv/config dist/index.js dotenv_config_path=.env",
+    "start": "node -r dotenv/config dist/src/index.js",
+    "start:prod": "NODE_ENV=production node -r dotenv/config dist/src/index.js dotenv_config_path=.env",
     "dev": "ts-node-dev --respawn --transpile-only -r dotenv/config src/index.ts dotenv_config_path=.env.local",
     "dev:prod": "NODE_ENV=production ts-node-dev --respawn --transpile-only -r dotenv/config src/index.ts dotenv_config_path=.env",
     "clean": "rimraf dist"

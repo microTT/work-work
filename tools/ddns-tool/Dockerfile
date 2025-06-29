@@ -27,8 +27,6 @@ RUN npm ci --only=production && npm cache clean --force
 
 # Copy built application and config
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/utils ./utils
-COPY config.ts ./
 
 # Create directories
 RUN mkdir -p logs cache
