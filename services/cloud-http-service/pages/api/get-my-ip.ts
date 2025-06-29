@@ -1,4 +1,6 @@
+import requestIp from 'request-ip';
 import { NextApiRequest, NextApiResponse } from 'next';
+
 import { createLogger } from '../../utils/logger';
 
 // 创建专用日志器
@@ -10,6 +12,7 @@ interface IPResponse {
   source?: string;
   timestamp?: string;
   error?: string;
+  headers?: Record<string, string>;
 }
 
 export default async function handler(
@@ -27,51 +30,40 @@ export default async function handler(
   try {
     logger.info('Get-my-ip API request');
 
-    // 获取客户端IP地址
-    const forwardedFor = req.headers['x-forwarded-for'];
-    const realIP = req.headers['x-real-ip'];
-    const remoteAddress = req.socket.remoteAddress;
-
-    let clientIP: string | undefined;
-    let source: string = 'unknown';
-
-    // 优先顺序: x-real-ip > x-forwarded-for > remoteAddress
-    if (realIP && typeof realIP === 'string') {
-      clientIP = realIP;
-      source = 'x-real-ip';
-      logger.info('IP extracted from X-Real-IP header');
-    } else if (forwardedFor) {
-      const forwardedIPs = Array.isArray(forwardedFor) 
-        ? forwardedFor[0] 
-        : forwardedFor;
-      clientIP = forwardedIPs.split(',')[0].trim();
-      source = 'x-forwarded-for';
-      logger.info('IP extracted from X-Forwarded-For header');
-    } else if (remoteAddress) {
-      clientIP = remoteAddress;
-      source = 'socket';
-      logger.info('IP extracted from socket');
+    // 使用 request-ip 包获取客户端IP地址
+    const clientIP = requestIp.getClientIp(req);
+    
+    if (!clientIP) {
+      logger.warn('No IP address found by request-ip package');
+      logger.error('Failed to extract IP address');
+      return res.status(400).json({
+        headers: req.headers as unknown as Record<string, string>,
+        success: false,
+        error: 'Unable to determine client IP address'
+      });
     }
 
     // 验证IP地址格式（IPv4）
     const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
-    if (!clientIP || !ipv4Regex.test(clientIP)) {
-      logger.warn('No valid IPv4 address found in request headers or connection');
+    if (!ipv4Regex.test(clientIP)) {
+      logger.warn('Invalid IPv4 address format', { ip: clientIP });
       logger.error('Failed to extract valid IPv4 address');
       return res.status(400).json({
+        headers: req.headers as unknown as Record<string, string>,
         success: false,
-        error: 'Unable to determine client IP address'
+        error: 'Invalid IP address format'
       });
     }
 
     const response: IPResponse = {
       success: true,
       ip: clientIP,
-      source,
-      timestamp: new Date().toISOString()
+      source: 'request-ip',
+      timestamp: new Date().toISOString(),
+      headers: req.headers as unknown as Record<string, string>,
     };
 
-    logger.info('Successfully returned client IP');
+    logger.info('Successfully returned client IP', { ip: clientIP });
     res.status(200).json(response);
 
   } catch (error) {
@@ -80,7 +72,8 @@ export default async function handler(
     
     res.status(500).json({
       success: false,
-      error: 'Internal server error'
+      error: 'Internal server error',
+      headers: req.headers as unknown as Record<string, string>,
     });
   }
 } 
