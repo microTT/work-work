@@ -20,10 +20,16 @@ export interface DDNSConfig {
   port: number;
   retryAttempts: number;
   retryDelay: number;
-  // 新增敏感配置项
+  // DNS 配置项
   dnsApiKey?: string;
   dnsSecretKey?: string;
+  domainName?: string;
+  recordName?: string;
+  recordType?: string;
+  recordId?: string;
+  // 通知配置项
   webhookUrl?: string;
+  enableWebhookNotification: boolean;
 }
 
 export function loadConfig(): DDNSConfig {
@@ -31,12 +37,18 @@ export function loadConfig(): DDNSConfig {
     cloudServiceUrl: process.env.CLOUD_SERVICE_URL || 'http://localhost:9110',
     checkInterval: parseInt(process.env.CHECK_INTERVAL_SECONDS || '30') * 1000,
     cacheFile: process.env.CACHE_FILE_PATH || './cache/ip-cache.json',
-    port: parseInt(process.env.HEALTH_CHECK_PORT || '9910'),
+    port: parseInt(process.env.DDNS_HEALTH_PORT || '9910'),
     retryAttempts: parseInt(process.env.RETRY_ATTEMPTS || '3'),
     retryDelay: parseInt(process.env.RETRY_DELAY_SECONDS || '2') * 1000,
-    // 敏感配置项
-    dnsApiKey: process.env.DNS_API_KEY,
-    dnsSecretKey: process.env.DNS_SECRET_KEY,
-    webhookUrl: process.env.WEBHOOK_URL
+    // DNS 配置项
+    dnsApiKey: process.env.ALIYUN_AK,
+    dnsSecretKey: process.env.ALIYUN_SK,
+    domainName: process.env.DOMAIN_NAME, // 例如: example.com
+    recordName: process.env.RECORD_NAME, // 例如: www 或 @ (根域名)
+    recordType: process.env.RECORD_TYPE || 'A',
+    recordId: process.env.RECORD_ID, // 阿里云DNS记录ID
+    // 通知配置项
+    webhookUrl: process.env.WEBHOOK_URL,
+    enableWebhookNotification: !!process.env.WEBHOOK_URL
   };
 } 

@@ -9,6 +9,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { createLogger } from '../utils/logger';
 import { loadConfig, DDNSConfig } from '../config';
+import { AliCloudDNSService } from './alicloud-dns';
+import { NotificationService } from './notification';
 
 // 日志器
 const logger = createLogger('ddns-tool');
@@ -34,10 +36,6 @@ class NetworkService {
           timeout: 10000,
           headers: {
             'User-Agent': 'DDNS-Tool/2.0',
-            // 开发环境模拟IP
-            ...(process.env.NODE_ENV === 'development' && {
-              'X-Real-IP': '203.0.113.100'
-            })
           }
         });
 
@@ -67,28 +65,83 @@ class IPMonitorService {
   
   constructor(
     private config: DDNSConfig,
-    private networkService: NetworkService
+    private networkService: NetworkService,
+    private dnsService: AliCloudDNSService | null,
+    private notificationService: NotificationService
   ) {}
 
   async checkIPChange(): Promise<void> {
     try {
       const newIP = await this.networkService.fetchIP();
-      if (!newIP) return;
-
-      if (this.currentIP && this.currentIP !== newIP) {
-        logger.info(`🔄 IP changed: ${this.currentIP} -> ${newIP}`);
-        // TODO: 这里可以添加DNS更新和通知逻辑
-      } else if (!this.currentIP) {
-        logger.info(`🆕 Initial IP recorded: ${newIP}`);
+      if (!newIP) {
+        await this.notificationService.sendErrorNotification('Failed to fetch IP address');
+        return;
       }
 
-      this.currentIP = newIP;
-      this.saveCache();
+      if (newIP && newIP !== this.currentIP) {
+        logger.info(`🔄 IP changed: ${this.currentIP} -> ${newIP}`);
+        
+        // 更新DNS记录
+        const updateSuccess = await this.updateDNSRecord(newIP);
+        
+        // 发送通知
+        await this.notificationService.sendIPChangeNotification(
+          this.currentIP, 
+          newIP, 
+          updateSuccess,
+          updateSuccess ? undefined : 'DNS update failed'
+        );
+
+        this.currentIP = newIP;
+        this.saveCache();
+        
+      } else if (!this.currentIP) {
+        logger.info(`🆕 Initial IP recorded: ${newIP}`);
+        
+        // 发送初始IP通知
+        await this.notificationService.sendInitialIPNotification(newIP);
+      }
+
       
     } catch (error: any) {
       logger.error('Error during IP check', { error: error.message });
+      await this.notificationService.sendErrorNotification(error.message, this.currentIP);
     }
   }
+
+  /**
+   * 更新DNS记录
+   */
+  private async updateDNSRecord(newIP: string): Promise<boolean> {
+    if (!this.dnsService) {
+      logger.warn('DNS服务未配置，跳过DNS更新');
+      return false;
+    }
+
+    try {
+      // 使用配置中的记录ID
+      if (!this.config.recordId) {
+        logger.error('DNS记录ID未配置，跳过DNS更新');
+        return false;
+      }
+
+      // 更新DNS记录
+      const success = await this.dnsService.updateDomainRecord(this.config.recordId, newIP);
+      
+      if (success) {
+        logger.info('✅ DNS记录更新成功', { recordId: this.config.recordId, newIP });
+      } else {
+        logger.error('❌ DNS记录更新失败');
+      }
+      
+      return success;
+    } catch (error: any) {
+      logger.error('DNS更新过程中发生错误', { error: error.message });
+      return false;
+    }
+  }
+
+
 
   private saveCache(): void {
     try {
@@ -113,7 +166,9 @@ class IPMonitorService {
       if (fs.existsSync(this.config.cacheFile)) {
         const cacheData: CacheData = JSON.parse(fs.readFileSync(this.config.cacheFile, 'utf-8'));
         this.currentIP = cacheData.currentIP || '';
-        logger.info('Cache loaded', { currentIP: this.currentIP });
+        logger.info('Cache loaded', { 
+          currentIP: this.currentIP
+        });
       }
     } catch (error: any) {
       logger.warn('Failed to load cache', { error: error.message });
@@ -130,6 +185,8 @@ class DDNSService {
   private app: express.Application;
   private config: DDNSConfig;
   private networkService: NetworkService;
+  private dnsService: AliCloudDNSService | null = null;
+  private notificationService: NotificationService;
   private ipMonitorService: IPMonitorService;
   private isRunning: boolean = false;
   private checkTimer: NodeJS.Timeout | null = null;
@@ -138,9 +195,39 @@ class DDNSService {
     this.app = express();
     this.config = loadConfig();
     this.networkService = new NetworkService(this.config);
-    this.ipMonitorService = new IPMonitorService(this.config, this.networkService);
-    this.setupRoutes();
+    this.notificationService = new NotificationService(this.config);
     
+    // 初始化DNS服务（如果配置完整）
+    if (this.config.dnsApiKey && this.config.dnsSecretKey) {
+      try {
+        this.dnsService = new AliCloudDNSService(this.config);
+        if (this.dnsService.validateConfig()) {
+          logger.info('✅ 阿里云DNS服务初始化成功');
+        } else {
+          logger.warn('⚠️  DNS配置不完整，DNS功能将被禁用');
+          this.dnsService = null;
+        }
+      } catch (error: any) {
+        logger.error('❌ DNS服务初始化失败', { error: error.message });
+        this.dnsService = null;
+      }
+    } else {
+      logger.info('DNS凭据未配置，DNS更新功能将被禁用');
+    }
+
+    // 验证通知配置
+    if (!this.notificationService.validateConfig()) {
+      logger.warn('⚠️  通知配置验证失败');
+    }
+
+    this.ipMonitorService = new IPMonitorService(
+      this.config, 
+      this.networkService, 
+      this.dnsService,
+      this.notificationService
+    );
+    
+    this.setupRoutes();
     logger.info('DDNS Tool initialized');
   }
 
@@ -155,7 +242,9 @@ class DDNSService {
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         currentIP: this.ipMonitorService.getCurrentIP(),
-        isRunning: this.isRunning
+        isRunning: this.isRunning,
+        dnsEnabled: !!this.dnsService,
+        webhookEnabled: this.config.enableWebhookNotification
       });
     });
 
@@ -163,9 +252,36 @@ class DDNSService {
     this.app.get('/status', (req: express.Request, res: express.Response) => {
       res.json({
         currentIP: this.ipMonitorService.getCurrentIP(),
+        recordId: this.config.recordId ? '***' : null,
         isRunning: this.isRunning,
-        lastCheck: new Date().toISOString()
+        lastCheck: new Date().toISOString(),
+        config: {
+          domain: this.config.domainName,
+          record: this.config.recordName,
+          checkInterval: this.config.checkInterval / 1000,
+          dnsEnabled: !!this.dnsService,
+          webhookEnabled: this.config.enableWebhookNotification
+        }
       });
+    });
+
+    // 手动触发IP检查
+    this.app.post('/check', async (req: express.Request, res: express.Response) => {
+      try {
+        logger.info('手动触发IP检查');
+        await this.ipMonitorService.checkIPChange();
+        res.json({
+          success: true,
+          message: 'IP check triggered successfully',
+          currentIP: this.ipMonitorService.getCurrentIP()
+        });
+      } catch (error: any) {
+        logger.error('手动IP检查失败', { error: error.message });
+        res.status(500).json({
+          success: false,
+          error: error.message
+        });
+      }
     });
   }
 
@@ -206,7 +322,7 @@ class DDNSService {
 
 // 启动服务
 function main(): void {
-  logger.info('🌟 Starting Simple DDNS Tool');
+  logger.info('🌟 Starting Enhanced DDNS Tool with Alibaba Cloud DNS');
   
   const service = new DDNSService();
   

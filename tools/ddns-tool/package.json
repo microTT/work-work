@@ -21,6 +21,11 @@
   "author": "microTT",
   "license": "MIT",
   "dependencies": {
+    "@alicloud/alidns20150109": "^3.4.10",
+    "@alicloud/credentials": "^2.4.3",
+    "@alicloud/openapi-client": "^0.4.14",
+    "@alicloud/tea-typescript": "^1.8.0",
+    "@alicloud/tea-util": "^1.4.10",
     "axios": "^1.6.0",
     "dotenv": "^16.6.1",
     "express": "^4.18.0",
