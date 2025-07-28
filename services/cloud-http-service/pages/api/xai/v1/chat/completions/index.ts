@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next'
-import { createLogger } from '../../../../utils/logger'
+import { createLogger } from '../../../../../../utils/logger'
 
 // 创建专用日志器
 const logger = createLogger('xai-proxy-api')
