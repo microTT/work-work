@@ -8,7 +8,14 @@
     "build": "next build",
     "start": "next start -p 9110",
     "start:local": "NODE_ENV=development next start -p 9110",
-    "lint": "next lint"
+    "lint": "next lint",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop cloud-http-service",
+    "pm2:restart": "pm2 restart cloud-http-service",
+    "pm2:reload": "pm2 reload cloud-http-service",
+    "pm2:delete": "pm2 delete cloud-http-service",
+    "pm2:logs": "pm2 logs cloud-http-service",
+    "pm2:monit": "pm2 monit"
   },
   "dependencies": {
     "dotenv": "^17.0.0",
@@ -23,6 +30,7 @@
     "@types/react-dom": "^18",
     "eslint": "^8",
     "eslint-config-next": "14.2.30",
+    "pm2": "^5.3.0",
     "typescript": "^5"
   },
   "engines": {
